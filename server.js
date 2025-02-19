@@ -9,10 +9,12 @@ const WebSocket = require('ws');
 // Initialize express apps
 const webApp = express();
 const eventApp = express();
+const hikApp = express(); // New app for HIK camera events
 
 // Parse JSON bodies
 webApp.use(express.json());
 eventApp.use(express.json());
+hikApp.use(express.json());
 
 // Add logging middleware only for POST requests
 const morganMiddleware = morgan('combined', {
@@ -23,13 +25,15 @@ const morganMiddleware = morgan('combined', {
 
 webApp.use(morganMiddleware);
 eventApp.use(morganMiddleware);
+hikApp.use(morganMiddleware);
 
 // Create HTTP servers
 const webServer = require('http').createServer(webApp);
 const eventServer = require('http').createServer(eventApp);
+const hikServer = require('http').createServer(hikApp);
 
-// Initialize WebSocket server on the web server
-const wss = new WebSocket.Server({ server: webServer });
+// Initialize WebSocket server on the event server
+const wss = new WebSocket.Server({ server: eventServer });
 
 // WebSocket connection handling
 wss.on('connection', (ws) => {
@@ -60,19 +64,45 @@ async function sendDashboardData(ws) {
     }
 }
 
-// Parse JSON bodies
-app.use(express.json());
-
-// Add logging middleware only for POST requests
-app.use(morgan('combined', {
-  skip: function (req, res) { 
-    // Skip logging for all GET requests and successful responses
-    return req.method === 'GET' || res.statusCode < 400;
-  }
-}));
-
 // Serve static files from uploads directory
 webApp.use('/uploads', express.static('uploads'));
+
+// Start servers on different ports
+const startServers = async () => {
+  try {
+    await new Promise((resolve) => webServer.listen(3000, () => {
+      console.log('Web UI server running on port 3000');
+      resolve();
+    }));
+
+    await new Promise((resolve) => eventServer.listen(8080, () => {
+      console.log('Event/WebSocket server running on port 8080');
+      resolve();
+    }));
+
+    await new Promise((resolve) => hikServer.listen(9001, () => {
+      console.log('HIK camera event server running on port 9001');
+      resolve();
+    }));
+  } catch (error) {
+    console.error('Error starting servers:', error);
+    shutdownServers();
+  }
+};
+
+startServers();
+
+// Configure HIK camera event endpoint
+hikApp.post('/event', async (req, res) => {
+  try {
+    // Handle HIK camera events
+    // TODO: Implement event processing logic
+    res.status(200).send('Event received');
+  } catch (error) {
+    console.error('Error processing HIK event:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Site management endpoints on web server
 webApp.get('/api/sites/:id', async (req, res) => {
@@ -393,7 +423,7 @@ webApp.get('/manage-sites', async (req, res) => {
 
 // Serve HTML content
 // Main dashboard showing sites overview
-app.get('/', async (req, res) => {
+webApp.get('/', async (req, res) => {
   try {
     const sites = await db.getSiteStats();
     const stats = await db.getEventStats();
@@ -549,7 +579,7 @@ app.get('/', async (req, res) => {
 });
 
 // Site-specific events page
-app.get('/manage-cameras', async (req, res) => {
+webApp.get('/manage-cameras', async (req, res) => {
   try {
     const cameras = await db.getCameras();
     const sites = await db.getSiteStats();
@@ -759,7 +789,7 @@ app.get('/manage-cameras', async (req, res) => {
   }
 });
 
-app.get('/site/:id', async (req, res) => {
+webApp.get('/site/:id', async (req, res) => {
   try {
     const siteId = req.params.id;
     const site = await db.getSiteById(siteId);
@@ -848,7 +878,7 @@ const upload = multer({
   }
 });
 
-app.post(['/', '/hik'], upload.fields([
+eventApp.post(['/', '/hik'], upload.fields([
   { name: 'licensePlateImage', maxCount: 1 },
   { name: 'vehicleImage', maxCount: 1 },
   { name: 'detectionImage', maxCount: 1 }
@@ -926,28 +956,16 @@ app.post(['/', '/hik'], upload.fields([
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
+// Error handling middleware for both applications
+webApp.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+eventApp.use((err, req, res, next) => {
   console.error('Server error:', err);
   res.status(500).json({
     error: 'Internal server error',
     message: err.message
   });
-});
-
-// Start the server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
-
-// Start the servers
-const WEB_PORT = process.env.WEB_PORT || 3000;
-const EVENT_PORT = process.env.EVENT_PORT || 3001;
-
-webServer.listen(WEB_PORT, () => {
-  console.log(`Web server running on port ${WEB_PORT}`);
-});
-
-eventServer.listen(EVENT_PORT, () => {
-  console.log(`Event server running on port ${EVENT_PORT}`);
 });
