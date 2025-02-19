@@ -75,17 +75,7 @@ app.use(morgan('combined', {
 webApp.use('/uploads', express.static('uploads'));
 
 // Site management endpoints on web server
-webApp.get('/api/sites', async (req, res) => {
-  try {
-    const sites = await db.getSiteStats();
-    res.json(sites);
-  } catch (error) {
-    console.error('Error fetching sites:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/api/sites/:id', async (req, res) => {
+webApp.get('/api/sites/:id', async (req, res) => {
   try {
     const site = await db.getSiteById(req.params.id);
     if (!site) {
@@ -99,7 +89,7 @@ app.get('/api/sites/:id', async (req, res) => {
 });
 
 // Camera management endpoints
-app.get('/api/cameras', async (req, res) => {
+webApp.get('/api/cameras', async (req, res) => {
   try {
     const siteId = req.query.siteId;
     const cameras = await db.getCameras(siteId);
@@ -110,7 +100,7 @@ app.get('/api/cameras', async (req, res) => {
   }
 });
 
-app.post('/api/cameras', async (req, res) => {
+webApp.post('/api/cameras', async (req, res) => {
   try {
     const { channelID, macAddress, name, description, site_id } = req.body;
     if (!channelID || !site_id) {
@@ -124,7 +114,7 @@ app.post('/api/cameras', async (req, res) => {
   }
 });
 
-app.put('/api/cameras/:id', async (req, res) => {
+webApp.put('/api/cameras/:id', async (req, res) => {
   try {
     const { name, description, site_id } = req.body;
     const { id } = req.params;
@@ -136,7 +126,7 @@ app.put('/api/cameras/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/cameras/:id', async (req, res) => {
+webApp.delete('/api/cameras/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await db.deleteCamera(id);
@@ -147,7 +137,7 @@ app.delete('/api/cameras/:id', async (req, res) => {
   }
 });
 
-app.post('/api/sites', async (req, res) => {
+webApp.post('/api/sites', async (req, res) => {
   try {
     const { name, description } = req.body;
     if (!name) {
@@ -161,7 +151,7 @@ app.post('/api/sites', async (req, res) => {
   }
 });
 
-app.put('/api/sites/:id', async (req, res) => {
+webApp.put('/api/sites/:id', async (req, res) => {
   try {
     const { name, description } = req.body;
     const { id } = req.params;
@@ -176,7 +166,7 @@ app.put('/api/sites/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/sites/:id', async (req, res) => {
+webApp.delete('/api/sites/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await db.deleteSite(id);
