@@ -48,7 +48,7 @@ eventApp.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Parse JSON bodies
 webApp.use(express.json());
-eventApp.use(express.json());
+
 hikApp.use(express.json());
 
 // Add logging middleware only for POST requests
@@ -59,7 +59,7 @@ const morganMiddleware = morgan('combined', {
 });
 
 webApp.use(morganMiddleware);
-eventApp.use(morganMiddleware);
+
 hikApp.use(morganMiddleware);
 
 // Create HTTP servers
@@ -125,7 +125,6 @@ const shutdownServers = async () => {
   try {
     await Promise.all([
       new Promise(resolve => webServer.close(resolve)),
-      new Promise(resolve => eventServer.close(resolve)),
       new Promise(resolve => hikServer.close(resolve)),
       db.close()
     ]);
@@ -151,12 +150,7 @@ const startServers = async () => {
           resolve();
         }).on('error', reject);
       }),
-      new Promise((resolve, reject) => {
-        eventServer.listen(8080, () => {
-          console.log('Event/WebSocket server running on port 8080');
-          resolve();
-        }).on('error', reject);
-      }),
+      
       new Promise((resolve, reject) => {
         hikServer.listen(9001, () => {
           console.log('HIK camera event server running on port 9001');
@@ -243,13 +237,5 @@ const errorHandler = (err, req, res, next) => {
 };
 
 webApp.use(errorHandler);
-eventApp.use(errorHandler);
-hikApp.use(errorHandler);
 
-eventApp.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: err.message
-  });
-});
+hikApp.use(errorHandler);
