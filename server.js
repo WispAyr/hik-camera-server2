@@ -66,7 +66,6 @@ const webServer = require('http').createServer(webApp);
 const hikServer = require('http').createServer(hikApp);
 
 // Initialize WebSocket server on the event server
-const wss = new WebSocket.Server({ server: eventServer });
 
 // Broadcast to all connected WebSocket clients
 function broadcastUpdate(data) {
