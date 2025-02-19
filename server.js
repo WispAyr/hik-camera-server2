@@ -21,7 +21,12 @@ const storage = multer.diskStorage({
   }
 });
 
-const uploadHandler = multer({ storage: storage });
+const hikUploadHandler = multer({
+  dest: 'uploads/',
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
 
 // Initialize express apps
 const webApp = express();
