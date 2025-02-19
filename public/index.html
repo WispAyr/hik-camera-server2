@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HIK Camera Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-title {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .navigation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .nav-card {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            text-decoration: none;
+            color: #e0e0e0;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .nav-card:hover {
+            transform: translateY(-2px);
+            background-color: #3d3d3d;
+        }
+
+        .nav-title {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .nav-description {
+            font-size: 14px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1 class="title">HIK Camera Dashboard</h1>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-title">Total Events</div>
+                <div class="stat-value" id="totalEvents">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Last 24 Hours</div>
+                <div class="stat-value" id="last24h">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Active Cameras</div>
+                <div class="stat-value" id="activeCameras">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Unique Plates</div>
+                <div class="stat-value" id="uniquePlates">-</div>
+            </div>
+        </div>
+
+        <div class="navigation-grid">
+            <a href="/events.html" class="nav-card">
+                <div class="nav-title">Events</div>
+                <div class="nav-description">View all captured events and license plates</div>
+            </a>
+            <a href="/site.html" class="nav-card">
+                <div class="nav-title">Sites</div>
+                <div class="nav-description">Manage camera sites and configurations</div>
+            </a>
+            <a href="/cameras.html" class="nav-card">
+                <div class="nav-title">Cameras</div>
+                <div class="nav-description">Add and manage camera configurations</div>
+            </a>
+            <a href="/site-add.html" class="nav-card">
+                <div class="nav-title">Add Site</div>
+                <div class="nav-description">Create a new monitoring site</div>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectDelay = 1000;
+
+        function updateStats(stats) {
+            document.getElementById('totalEvents').textContent = stats.total_events || '-';
+            document.getElementById('last24h').textContent = stats.last_24h_events || '-';
+            document.getElementById('activeCameras').textContent = stats.active_cameras || '-';
+            document.getElementById('uniquePlates').textContent = stats.unique_plates || '-';
+        }
+
+        function showError(message) {
+            const cards = document.querySelectorAll('.stat-value');
+            cards.forEach(card => {
+                card.textContent = '!';
+                card.style.color = '#ff4444';
+            });
+            console.error(message);
+        }
+
+        function connectWebSocket() {
+            if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
+                return;
+            }
+
+            ws = new WebSocket(`ws://${window.location.hostname}:8080`);
+
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                reconnectAttempts = 0;
+                document.querySelectorAll('.stat-value').forEach(card => {
+                    card.style.color = '#fff';
+                });
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'dashboard_update') {
+                        updateStats(data.stats);
+                    }
+                } catch (error) {
+                    showError('Failed to parse data');
+                }
+            };
+
+            ws.onclose = function() {
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    setTimeout(connectWebSocket, reconnectDelay * reconnectAttempts);
+                } else {
+                    showError('Connection lost');
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                showError('Connection error');
+            };
+        }
+
+        // Initial connection
+        connectWebSocket();
+
+        // Reconnect when page becomes visible
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                connectWebSocket();
+            }
+        });
+    </script>
+</body>
+</html>

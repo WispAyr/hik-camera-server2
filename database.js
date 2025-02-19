@@ -128,7 +128,7 @@ class Database extends EventEmitter {
                     event.images?.licensePlate,
                     event.images?.vehicle,
                     event.images?.detection,
-                    null  // site_id is not assigned automatically
+                    event.site_id || null  // Use site_id if provided, otherwise null
                 ];
 
                 this.db.run(sql, params, function(err) {
