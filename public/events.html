@@ -229,7 +229,7 @@
 
         // Set up WebSocket connection for real-time updates
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${window.location.hostname}:8080`);
+        const ws = new WebSocket(`${protocol}//${window.location.host}:8080`);
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'eventUpdate') {
