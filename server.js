@@ -210,18 +210,20 @@ const handleVehicleDetection = async (req, res, next) => {
       direction: req.query.direction,
       confidenceLevel: req.query.confidenceLevel,
       macAddress: req.query.macAddress,
-      images: {}
+      licensePlateImage: null,
+      vehicleImage: null,
+      detectionImage: null
     };
 
     if (req.files) {
       if (req.files.licensePlate) {
-        eventData.images.licensePlate = req.files.licensePlate[0].filename;
+        eventData.licensePlateImage = req.files.licensePlate[0].filename;
       }
       if (req.files.vehicle) {
-        eventData.images.vehicle = req.files.vehicle[0].filename;
+        eventData.vehicleImage = req.files.vehicle[0].filename;
       }
       if (req.files.detection) {
-        eventData.images.detection = req.files.detection[0].filename;
+        eventData.detectionImage = req.files.detection[0].filename;
       }
     }
     
