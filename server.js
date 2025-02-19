@@ -12,6 +12,7 @@ const eventApp = express();
 const hikApp = express(); // New app for HIK camera events
 
 // Serve static files from public directory
+webApp.use('/public', express.static(path.join(__dirname, 'public')));
 webApp.use(express.static(path.join(__dirname, 'public')));
 
 // Parse JSON bodies
