@@ -180,33 +180,35 @@
             return `
                 <div class="event-card">
                     <div class="event-images">
-                        <img class="event-image" src="${event.licensePlateImage ? `/uploads/${event.licensePlateImage}` : '/No-Image-Placeholder.svg'}" alt="License Plate" onerror="this.src='/No-Image-Placeholder.svg'">
-                        <img class="event-image" src="${event.vehicleImage ? `/uploads/${event.vehicleImage}` : '/No-Image-Placeholder.svg'}" alt="Vehicle" onerror="this.src='/No-Image-Placeholder.svg'">
-                        <img class="event-image" src="${event.detectionImage ? `/uploads/${event.detectionImage}` : '/No-Image-Placeholder.svg'}" alt="Detection" onerror="this.src='/No-Image-Placeholder.svg'">
+                        <img class="event-image" src="${event.licensePlateImage ? `/uploads/${event.licensePlateImage}` : '/public/No-Image-Placeholder.svg'}" alt="License Plate" onerror="this.src='/public/No-Image-Placeholder.svg'">
+                        <img class="event-image" src="${event.vehicleImage ? `/uploads/${event.vehicleImage}` : '/public/No-Image-Placeholder.svg'}" alt="Vehicle" onerror="this.src='/public/No-Image-Placeholder.svg'">
+                        <img class="event-image" src="${event.detectionImage ? `/uploads/${event.detectionImage}` : '/public/No-Image-Placeholder.svg'}" alt="Detection" onerror="this.src='/public/No-Image-Placeholder.svg'">
                     </div>
-                    <div class="event-header">
-                        <span class="license-plate">${event.licensePlate}</span>
-                        <span class="timestamp">${formatDate(event.dateTime)}</span>
-                    </div>
-                    <div class="event-details">
-                        <span class="detail-label">Country:</span>
-                        <span class="detail-value">${event.country || 'N/A'}</span>
-                        
-                        <span class="detail-label">Lane:</span>
-                        <span class="detail-value">${event.lane || 'N/A'}</span>
-                        
-                        <span class="detail-label">Direction:</span>
-                        <span class="detail-value direction-indicator">
-                            <span class="direction-icon">${getDirectionIcon(event.direction || '')}</span>
-                            ${event.direction || 'N/A'}
-                        </span>
-                        
-                        <span class="detail-label">Confidence:</span>
-                        <span class="detail-value">
-                            <span class="confidence-indicator ${getConfidenceClass(event.confidenceLevel)}">
-                                ${event.confidenceLevel || 'N/A'}%
+                    <div class="event-content">
+                        <div class="event-header">
+                            <span class="license-plate">${event.licensePlate || 'Unknown'}</span>
+                            <span class="timestamp">${formatDate(event.dateTime)}</span>
+                        </div>
+                        <div class="event-details">
+                            <span class="detail-label">Country:</span>
+                            <span class="detail-value">${event.country || 'N/A'}</span>
+                            
+                            <span class="detail-label">Lane:</span>
+                            <span class="detail-value">${event.lane || 'N/A'}</span>
+                            
+                            <span class="detail-label">Direction:</span>
+                            <span class="detail-value direction-indicator">
+                                <span class="direction-icon">${getDirectionIcon(event.direction || '')}</span>
+                                ${event.direction || 'N/A'}
                             </span>
-                        </span>
+                            
+                            <span class="detail-label">Confidence:</span>
+                            <span class="detail-value">
+                                <span class="confidence-indicator ${getConfidenceClass(event.confidenceLevel)}">
+                                    ${event.confidenceLevel || 'N/A'}%
+                                </span>
+                            </span>
+                        </div>
                     </div>
                 </div>
             `;
@@ -226,7 +228,8 @@
         updateEvents();
 
         // Set up WebSocket connection for real-time updates
-        const ws = new WebSocket(`ws://${window.location.hostname}:8080`);
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.hostname}:8080`);
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'eventUpdate') {

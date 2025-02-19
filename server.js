@@ -178,7 +178,13 @@ startServers();
 // Add API endpoints
 eventApp.get('/api/events', async (req, res) => {
     try {
-        const events = await db.getAllEvents();
+        const options = {
+            licensePlate: req.query.licensePlate,
+            dateFrom: req.query.start_date,
+            dateTo: req.query.end_date,
+            site_id: req.query.site_id
+        };
+        const events = await db.getAllEvents(options);
         res.json(events);
     } catch (error) {
         console.error('Error fetching events:', error);
