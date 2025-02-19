@@ -6,25 +6,30 @@ const fs = require('fs');
 const db = require('./database');
 const WebSocket = require('ws');
 
-// Initialize express app
-const app = express();
+// Initialize express apps
+const webApp = express();
+const eventApp = express();
 
 // Parse JSON bodies
-app.use(express.json());
+webApp.use(express.json());
+eventApp.use(express.json());
 
 // Add logging middleware only for POST requests
-app.use(morgan('combined', {
+const morganMiddleware = morgan('combined', {
   skip: function (req, res) { 
-    // Skip logging for all GET requests and successful responses
     return req.method === 'GET' || res.statusCode < 400;
   }
-}));
+});
 
-// Create HTTP server
-const server = require('http').createServer(app);
+webApp.use(morganMiddleware);
+eventApp.use(morganMiddleware);
 
-// Initialize WebSocket server
-const wss = new WebSocket.Server({ server });
+// Create HTTP servers
+const webServer = require('http').createServer(webApp);
+const eventServer = require('http').createServer(eventApp);
+
+// Initialize WebSocket server on the web server
+const wss = new WebSocket.Server({ server: webServer });
 
 // WebSocket connection handling
 wss.on('connection', (ws) => {
@@ -67,10 +72,10 @@ app.use(morgan('combined', {
 }));
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static('uploads'));
+webApp.use('/uploads', express.static('uploads'));
 
-// Site management endpoints
-app.get('/api/sites', async (req, res) => {
+// Site management endpoints on web server
+webApp.get('/api/sites', async (req, res) => {
   try {
     const sites = await db.getSiteStats();
     res.json(sites);
@@ -202,6 +207,8 @@ app.get('/manage-sites', async (req, res) => {
             '--accent: #005288;' +
             '--accent-hover: #006bb3;' +
             '--border: #1a1a1a;' +
+            '--success: #4CAF50;' +
+            '--error: #f44336;' +
           '}' +
           'body {' +
             'font-family: \'SF Pro Display\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;' +
@@ -211,27 +218,185 @@ app.get('/manage-sites', async (req, res) => {
             'color: var(--text-primary);' +
             'line-height: 1.6;' +
           '}' +
+          '.header {' +
+            'display: flex;' +
+            'justify-content: space-between;' +
+            'align-items: center;' +
+            'padding: 20px;' +
+            'background-color: var(--bg-secondary);' +
+            'border-radius: 12px;' +
+            'margin-bottom: 30px;' +
+          '}' +
+          '.header-buttons {' +
+            'display: flex;' +
+            'gap: 10px;' +
+          '}' +
+          '.button {' +
+            'background-color: var(--accent);' +
+            'color: var(--text-primary);' +
+            'border: none;' +
+            'padding: 10px 20px;' +
+            'border-radius: 8px;' +
+            'cursor: pointer;' +
+            'font-weight: 500;' +
+            'transition: background-color 0.3s ease;' +
+          '}' +
+          '.button:hover {' +
+            'background-color: var(--accent-hover);' +
+          '}' +
+          '.sites-grid {' +
+            'display: grid;' +
+            'grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));' +
+            'gap: 20px;' +
+            'margin-top: 20px;' +
+          '}' +
+          '.site-card {' +
+            'background-color: var(--bg-secondary);' +
+            'padding: 20px;' +
+            'border-radius: 12px;' +
+            'position: relative;' +
+          '}' +
+          '.site-form {' +
+            'background-color: var(--bg-secondary);' +
+            'padding: 20px;' +
+            'border-radius: 12px;' +
+            'margin-bottom: 20px;' +
+          '}' +
+          '.form-group {' +
+            'margin-bottom: 15px;' +
+          '}' +
+          '.form-group label {' +
+            'display: block;' +
+            'margin-bottom: 5px;' +
+          '}' +
+          '.form-group input, .form-group textarea {' +
+            'width: 100%;' +
+            'padding: 8px;' +
+            'border-radius: 4px;' +
+            'border: 1px solid var(--border);' +
+            'background-color: var(--bg-primary);' +
+            'color: var(--text-primary);' +
+          '}' +
+          '.delete-button {' +
+            'background-color: var(--error);' +
+            'color: var(--text-primary);' +
+            'border: none;' +
+            'padding: 5px 10px;' +
+            'border-radius: 4px;' +
+            'cursor: pointer;' +
+            'position: absolute;' +
+            'top: 10px;' +
+            'right: 10px;' +
+          '}' +
+          '.notification {' +
+            'position: fixed;' +
+            'bottom: 20px;' +
+            'right: 20px;' +
+            'padding: 15px;' +
+            'border-radius: 8px;' +
+            'color: var(--text-primary);' +
+            'display: none;' +
+          '}' +
+          '.notification.success {' +
+            'background-color: var(--success);' +
+          '}' +
+          '.notification.error {' +
+            'background-color: var(--error);' +
+          '}' +
         '</style>' +
       '</head>' +
       '<body>' +
         '<div class="header">' +
-          '<h1>Sites Overview</h1>' +
+          '<h1>Manage Sites</h1>' +
           '<div class="header-buttons">' +
-            '<button class="manage-button" onclick="window.location.href=\'/manage-sites\'">Manage Sites</button>' +
-            '<button class="manage-button" onclick="window.location.href=\'/manage-cameras\'">Manage Cameras</button>' +
-          '</div>' +
-          '<div id="clock"></div>' +
-        '</div>' +
-        '<div class="stats">' +
-          '<div class="stat-card">' +
-            '<div class="stat-value">' + (stats.totalEvents || 0) + '</div>' +
-            '<div>Total Events</div>' +
+            '<button class="button" onclick="window.location.href=\'/\'">' +
+              'Back to Dashboard' +
+            '</button>' +
           '</div>' +
         '</div>' +
+
+        '<div class="site-form">' +
+          '<h2>Add New Site</h2>' +
+          '<form id="addSiteForm">' +
+            '<div class="form-group">' +
+              '<label for="siteName">Site Name</label>' +
+              '<input type="text" id="siteName" required>' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label for="siteDescription">Description</label>' +
+              '<textarea id="siteDescription" rows="3"></textarea>' +
+            '</div>' +
+            '<button type="submit" class="button">Add Site</button>' +
+          '</form>' +
+        '</div>' +
+
+        '<div class="sites-grid">' +
+          sites.map(site => (
+            '<div class="site-card">' +
+              '<button class="delete-button" onclick="deleteSite(' + site.id + ')">Delete</button>' +
+              '<h3>' + site.name + '</h3>' +
+              '<p>' + (site.description || 'No description') + '</p>' +
+              '<div>Events: ' + (site.eventCount || 0) + '</div>' +
+              '<div>Last Detection: ' + (site.lastDetection || 'N/A') + '</div>' +
+            '</div>'
+          )).join('') +
+        '</div>' +
+
+        '<div id="notification" class="notification"></div>' +
+
+        '<script>' +
+          'document.getElementById("addSiteForm").addEventListener("submit", async (e) => {' +
+            'e.preventDefault();' +
+            'const name = document.getElementById("siteName").value;' +
+            'const description = document.getElementById("siteDescription").value;' +
+            'try {' +
+              'const response = await fetch("/api/sites", {' +
+                'method: "POST",' +
+                'headers: { "Content-Type": "application/json" },' +
+                'body: JSON.stringify({ name, description })' +
+              '});' +
+              'if (response.ok) {' +
+                'showNotification("Site added successfully", "success");' +
+                'setTimeout(() => window.location.reload(), 1000);' +
+              '} else {' +
+                'throw new Error("Failed to add site");' +
+              '}' +
+            '} catch (error) {' +
+              'showNotification("Error adding site", "error");' +
+            '}' +
+          '});' +
+
+          'async function deleteSite(id) {' +
+            'if (!confirm("Are you sure you want to delete this site?")) return;' +
+            'try {' +
+              'const response = await fetch(`/api/sites/${id}`, {' +
+                'method: "DELETE"' +
+              '});' +
+              'if (response.ok) {' +
+                'showNotification("Site deleted successfully", "success");' +
+                'setTimeout(() => window.location.reload(), 1000);' +
+              '} else {' +
+                'throw new Error("Failed to delete site");' +
+              '}' +
+            '} catch (error) {' +
+              'showNotification("Error deleting site", "error");' +
+            '}' +
+          '}' +
+
+          'function showNotification(message, type) {' +
+            'const notification = document.getElementById("notification");' +
+            'notification.textContent = message;' +
+            'notification.className = `notification ${type}`;' +
+            'notification.style.display = "block";' +
+            'setTimeout(() => {' +
+              'notification.style.display = "none";' +
+            '}, 3000);' +
+          '}' +
+        '</script>' +
       '</body>' +
       '</html>');
   } catch (error) {
-    console.error('Error rendering dashboard:', error);
+    console.error('Error rendering sites page:', error);
     res.status(500).send('Internal server error');
   }
 });
@@ -398,6 +563,7 @@ app.get('/', async (req, res) => {
 app.get('/manage-cameras', async (req, res) => {
   try {
     const cameras = await db.getCameras();
+    const sites = await db.getSiteStats();
     res.send('<!DOCTYPE html>' +
       '<html>' +
       '<head>' +
@@ -413,6 +579,8 @@ app.get('/manage-cameras', async (req, res) => {
             '--accent: #005288;' +
             '--accent-hover: #006bb3;' +
             '--border: #1a1a1a;' +
+            '--success: #4CAF50;' +
+            '--error: #f44336;' +
             '--overlay: rgba(0, 0, 0, 0.8);' +
           '}' +
           'body {' +
@@ -446,28 +614,154 @@ app.get('/manage-cameras', async (req, res) => {
             'font-weight: 500;' +
             'transition: background-color 0.3s ease;' +
           '}' +
+          '.button:hover {' +
+            'background-color: var(--accent-hover);' +
+          '}' +
+          '.cameras-grid {' +
+            'display: grid;' +
+            'grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));' +
+            'gap: 20px;' +
+          '}' +
+          '.camera-card {' +
+            'background-color: var(--bg-secondary);' +
+            'padding: 20px;' +
+            'border-radius: 12px;' +
+            'position: relative;' +
+          '}' +
+          '.camera-details {' +
+            'margin-bottom: 15px;' +
+          '}' +
+          '.edit-form {' +
+            'display: none;' +
+            'margin-top: 15px;' +
+          '}' +
+          '.edit-form.active {' +
+            'display: block;' +
+          '}' +
+          '.form-group {' +
+            'margin-bottom: 15px;' +
+          '}' +
+          '.form-group label {' +
+            'display: block;' +
+            'margin-bottom: 5px;' +
+          '}' +
+          '.form-group input, .form-group select {' +
+            'width: 100%;' +
+            'padding: 8px;' +
+            'border-radius: 4px;' +
+            'border: 1px solid var(--border);' +
+            'background-color: var(--bg-primary);' +
+            'color: var(--text-primary);' +
+          '}' +
+          '.notification {' +
+            'position: fixed;' +
+            'bottom: 20px;' +
+            'right: 20px;' +
+            'padding: 15px;' +
+            'border-radius: 8px;' +
+            'color: var(--text-primary);' +
+            'display: none;' +
+          '}' +
+          '.notification.success {' +
+            'background-color: var(--success);' +
+          '}' +
+          '.notification.error {' +
+            'background-color: var(--error);' +
+          '}' +
         '</style>' +
       '</head>' +
       '<body>' +
         '<div class="header">' +
           '<h1>Manage Cameras</h1>' +
           '<div class="header-buttons">' +
-            '<button class="button" onclick="window.location.href=\'/\'">Back to Dashboard</button>' +
+            '<button class="button" onclick="window.location.href=\'/\'">' +
+              'Back to Dashboard' +
+            '</button>' +
           '</div>' +
         '</div>' +
+
         '<div class="cameras-grid">' +
           cameras.map(camera => (
             '<div class="camera-card">' +
               '<div class="camera-details">' +
-                '<div>Name: ' + (camera.name || camera.channelID) + '</div>' +
+                '<h3>' + (camera.name || camera.channelID) + '</h3>' +
                 '<div>Channel ID: ' + camera.channelID + '</div>' +
                 '<div>MAC Address: ' + (camera.macAddress || 'N/A') + '</div>' +
                 '<div>Status: ' + camera.status + '</div>' +
                 '<div>Last Seen: ' + (camera.last_seen || 'N/A') + '</div>' +
+                '<button class="button" onclick="toggleEditForm(' + camera.id + ')">Edit</button>' +
               '</div>' +
+              '<form id="editForm' + camera.id + '" class="edit-form" onsubmit="updateCamera(event, ' + camera.id + ')">' +
+                '<div class="form-group">' +
+                  '<label>Name</label>' +
+                  '<input type="text" name="name" value="' + (camera.name || '') + '" required>' +
+                '</div>' +
+                '<div class="form-group">' +
+                  '<label>Description</label>' +
+                  '<input type="text" name="description" value="' + (camera.description || '') + '">' +
+                '</div>' +
+                '<div class="form-group">' +
+                  '<label>Assign to Site</label>' +
+                  '<select name="site_id" required>' +
+                    '<option value="">Select a site</option>' +
+                    sites.map(site => (
+                      '<option value="' + site.id + '"' + (site.id === camera.site_id ? ' selected' : '') + '>' +
+                        site.name +
+                      '</option>'
+                    )).join('') +
+                  '</select>' +
+                '</div>' +
+                '<button type="submit" class="button">Save Changes</button>' +
+              '</form>' +
             '</div>'
           )).join('') +
         '</div>' +
+
+        '<div id="notification" class="notification"></div>' +
+
+        '<script>' +
+          'function toggleEditForm(cameraId) {' +
+            'const form = document.getElementById(`editForm${cameraId}`);' +
+            'form.classList.toggle("active");' +
+          '}' +
+
+          'async function updateCamera(event, cameraId) {' +
+            'event.preventDefault();' +
+            'const form = event.target;' +
+            'const formData = {' +
+              'name: form.name.value,' +
+              'description: form.description.value,' +
+              'site_id: form.site_id.value' +
+            '};' +
+
+            'try {' +
+              'const response = await fetch(`/api/cameras/${cameraId}`, {' +
+                'method: "PUT",' +
+                'headers: { "Content-Type": "application/json" },' +
+                'body: JSON.stringify(formData)' +
+              '});' +
+
+              'if (response.ok) {' +
+                'showNotification("Camera updated successfully", "success");' +
+                'setTimeout(() => window.location.reload(), 1000);' +
+              '} else {' +
+                'throw new Error("Failed to update camera");' +
+              '}' +
+            '} catch (error) {' +
+              'showNotification("Error updating camera", "error");' +
+            '}' +
+          '}' +
+
+          'function showNotification(message, type) {' +
+            'const notification = document.getElementById("notification");' +
+            'notification.textContent = message;' +
+            'notification.className = `notification ${type}`;' +
+            'notification.style.display = "block";' +
+            'setTimeout(() => {' +
+              'notification.style.display = "none";' +
+            '}, 3000);' +
+          '}' +
+        '</script>' +
       '</body>' +
       '</html>');
   } catch (error) {
