@@ -1,8 +1,10 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const EventEmitter = require('events');
 
-class Database {
+class Database extends EventEmitter {
     constructor() {
+        super();
         this.dbPath = path.join(__dirname, 'events.db');
         this.db = new sqlite3.Database(this.dbPath, (err) => {
             if (err) {
@@ -133,6 +135,7 @@ class Database {
                     if (err) {
                         reject(err);
                     } else {
+                        this.emit('eventUpdate');
                         resolve(this.lastID);
                     }
                 });
@@ -196,6 +199,7 @@ class Database {
                 if (err) {
                     reject(err);
                 } else if (row) {
+                    this.emit('siteUpdate');
                     resolve(row.id);
                 } else {
                     // If no id returned, get the existing site id
@@ -211,52 +215,47 @@ class Database {
         });
     }
 
-    getSiteStats() {
+    async updateSite(id, name, description) {
         return new Promise((resolve, reject) => {
             const sql = `
-                SELECT 
-                    s.id,
-                    s.name,
-                    COUNT(e.id) as eventCount,
-                    MAX(e.dateTime) as lastDetection,
-                    (SELECT vehicleImage 
-                     FROM events e2 
-                     WHERE e2.site_id = s.id 
-                     ORDER BY e2.dateTime DESC 
-                     LIMIT 1) as lastVehicleImage
-                FROM sites s
-                LEFT JOIN events e ON s.id = e.site_id
-                GROUP BY s.id, s.name
-                ORDER BY s.name
+                UPDATE sites
+                SET name = ?, description = ?
+                WHERE id = ?
             `;
-
-            this.db.all(sql, [], (err, rows) => {
+            
+            this.db.run(sql, [name, description, id], (err) => {
                 if (err) {
                     reject(err);
                 } else {
-                    resolve(rows);
+                    this.emit('siteUpdate');
+                    resolve(this.changes);
                 }
             });
         });
     }
 
-    getEventStats() {
+    async deleteSite(id) {
         return new Promise((resolve, reject) => {
-            const sql = `
-                SELECT 
-                    COUNT(*) as totalEvents,
-                    COUNT(DISTINCT licensePlate) as uniqueVehicles,
-                    COUNT(DISTINCT channelID) as activeChannels,
-                    COUNT(DISTINCT site_id) as totalSites,
-                    MAX(dateTime) as lastDetection
-                FROM events
-            `;
-
-            this.db.get(sql, [], (err, row) => {
+            this.db.run('BEGIN TRANSACTION', async (err) => {
                 if (err) {
-                    reject(err);
-                } else {
-                    resolve(row);
+                    return reject(err);
+                }
+
+                try {
+                    await this.deleteEvents(id);
+                    await this.deleteCameras(id);
+                    const changes = await this.deleteSiteRecord(id);
+                    
+                    this.db.run('COMMIT', (commitErr) => {
+                        if (commitErr) {
+                            this.db.run('ROLLBACK', () => reject(commitErr));
+                        } else {
+                            this.emit('siteUpdate');
+                            resolve(changes);
+                        }
+                    });
+                } catch (error) {
+                    this.db.run('ROLLBACK', () => reject(error));
                 }
             });
         });
@@ -279,6 +278,7 @@ class Database {
                 if (err) {
                     reject(err);
                 } else {
+                    this.emit('cameraUpdate');
                     resolve(this.lastID);
                 }
             });
@@ -298,10 +298,11 @@ class Database {
                 camera.description,
                 camera.site_id,
                 id
-            ], function(err) {
+            ], (err) => {
                 if (err) {
                     reject(err);
                 } else {
+                    this.emit('cameraUpdate');
                     resolve(this.changes);
                 }
             });
@@ -312,10 +313,11 @@ class Database {
         return new Promise((resolve, reject) => {
             const sql = 'DELETE FROM cameras WHERE id = ?';
             
-            this.db.run(sql, [id], function(err) {
+            this.db.run(sql, [id], (err) => {
                 if (err) {
                     reject(err);
                 } else {
+                    this.emit('cameraUpdate');
                     resolve(this.changes);
                 }
             });
@@ -405,7 +407,7 @@ class Database {
                 WHERE id = ?
             `;
             
-            this.db.run(sql, [name, description, id], function(err) {
+            this.db.run(sql, [name, description, id], (err) => {
                 if (err) {
                     reject(err);
                 } else {

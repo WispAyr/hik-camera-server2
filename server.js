@@ -35,6 +35,15 @@ const hikServer = require('http').createServer(hikApp);
 // Initialize WebSocket server on the event server
 const wss = new WebSocket.Server({ server: eventServer });
 
+// Broadcast to all connected WebSocket clients
+function broadcastUpdate(data) {
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(data));
+        }
+    });
+}
+
 // WebSocket connection handling
 wss.on('connection', (ws) => {
     console.log('New client connected');
@@ -51,6 +60,19 @@ wss.on('connection', (ws) => {
         clearInterval(updateInterval);
         console.log('Client disconnected');
     });
+});
+
+// Subscribe to database events
+db.on('siteUpdate', () => {
+    broadcastUpdate({ type: 'site_update' });
+});
+
+db.on('cameraUpdate', () => {
+    broadcastUpdate({ type: 'camera_update' });
+});
+
+db.on('eventUpdate', () => {
+    broadcastUpdate({ type: 'event_update' });
 });
 
 // Function to send dashboard data to WebSocket clients
@@ -240,7 +262,148 @@ webApp.delete('/api/sites/:id', async (req, res) => {
   }
 });
 
+// Configuration endpoint for clearing database
+webApp.post('/api/config/clear-database', async (req, res) => {
+  try {
+    await db.clearDatabase();
+    res.json({ success: true, message: 'Database cleared successfully' });
+  } catch (error) {
+    console.error('Error clearing database:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Management pages
+webApp.get('/config', async (req, res) => {
+  res.send('<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+      '<title>Configuration - Vehicle Detection System</title>' +
+      '<meta charset="UTF-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+      '<style>' +
+        ':root {' +
+          '--bg-primary: #000000;' +
+          '--bg-secondary: #111111;' +
+          '--text-primary: #ffffff;' +
+          '--text-secondary: #808080;' +
+          '--accent: #005288;' +
+          '--accent-hover: #006bb3;' +
+          '--border: #1a1a1a;' +
+          '--success: #4CAF50;' +
+          '--error: #f44336;' +
+        '}' +
+        'body {' +
+          'font-family: \'SF Pro Display\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;' +
+          'margin: 0;' +
+          'padding: 20px;' +
+          'background-color: var(--bg-primary);' +
+          'color: var(--text-primary);' +
+          'line-height: 1.6;' +
+        '}' +
+        '.header {' +
+          'display: flex;' +
+          'justify-content: space-between;' +
+          'align-items: center;' +
+          'padding: 20px;' +
+          'background-color: var(--bg-secondary);' +
+          'border-radius: 12px;' +
+          'margin-bottom: 30px;' +
+        '}' +
+        '.header-buttons {' +
+          'display: flex;' +
+          'gap: 10px;' +
+        '}' +
+        '.button {' +
+          'background-color: var(--accent);' +
+          'color: var(--text-primary);' +
+          'border: none;' +
+          'padding: 10px 20px;' +
+          'border-radius: 8px;' +
+          'cursor: pointer;' +
+          'font-weight: 500;' +
+          'transition: background-color 0.3s ease;' +
+        '}' +
+        '.button:hover {' +
+          'background-color: var(--accent-hover);' +
+        '}' +
+        '.button.danger {' +
+          'background-color: var(--error);' +
+        '}' +
+        '.config-section {' +
+          'background-color: var(--bg-secondary);' +
+          'padding: 20px;' +
+          'border-radius: 12px;' +
+          'margin-bottom: 20px;' +
+        '}' +
+        '.notification {' +
+          'position: fixed;' +
+          'bottom: 20px;' +
+          'right: 20px;' +
+          'padding: 15px;' +
+          'border-radius: 8px;' +
+          'color: var(--text-primary);' +
+          'display: none;' +
+        '}' +
+        '.notification.success {' +
+          'background-color: var(--success);' +
+        '}' +
+        '.notification.error {' +
+          'background-color: var(--error);' +
+        '}' +
+      '</style>' +
+    '</head>' +
+    '<body>' +
+      '<div class="header">' +
+        '<h1>System Configuration</h1>' +
+        '<div class="header-buttons">' +
+          '<button class="button" onclick="window.location.href=\'/\'">' +
+            'Back to Dashboard' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="config-section">' +
+        '<h2>Database Management</h2>' +
+        '<p>Warning: Clearing the database will permanently delete all sites, cameras, and events.</p>' +
+        '<button class="button danger" onclick="clearDatabase()">Clear Database</button>' +
+      '</div>' +
+
+      '<div id="notification" class="notification"></div>' +
+
+      '<script>' +
+        'async function clearDatabase() {' +
+          'if (!confirm("Are you sure you want to clear the entire database? This action cannot be undone.")) return;' +
+          'try {' +
+            'const response = await fetch("/api/config/clear-database", {' +
+              'method: "POST",' +
+              'headers: { "Content-Type": "application/json" }' +
+            '});' +
+            'if (response.ok) {' +
+              'showNotification("Database cleared successfully", "success");' +
+              'setTimeout(() => window.location.href = "/", 2000);' +
+            '} else {' +
+              'throw new Error("Failed to clear database");' +
+            '}' +
+          '} catch (error) {' +
+            'showNotification("Error clearing database", "error");' +
+          '}' +
+        '}' +
+
+        'function showNotification(message, type) {' +
+          'const notification = document.getElementById("notification");' +
+          'notification.textContent = message;' +
+          'notification.className = `notification ${type}`;' +
+          'notification.style.display = "block";' +
+          'setTimeout(() => {' +
+            'notification.style.display = "none";' +
+          '}, 3000);' +
+        '}' +
+      '</script>' +
+    '</body>' +
+    '</html>');
+});
+
 webApp.get('/manage-sites', async (req, res) => {
   try {
     const sites = await db.getSiteStats();
