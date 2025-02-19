@@ -240,6 +240,7 @@ const handleVehicleDetection = async (req, res, next) => {
 // Handle events on both root path and /hik endpoint
 const uploadFields = [
   { name: 'licensePlate', maxCount: 1 },
+  { name: 'licensePlatePicture.jpg', maxCount: 1 },
   { name: 'vehicle', maxCount: 1 },
   { name: 'detection', maxCount: 1 }
 ];
