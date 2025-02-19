@@ -178,7 +178,7 @@ webApp.delete('/api/sites/:id', async (req, res) => {
 });
 
 // Management pages
-app.get('/manage-sites', async (req, res) => {
+webApp.get('/manage-sites', async (req, res) => {
   try {
     const sites = await db.getSiteStats();
     const stats = await db.getEventStats();
@@ -397,7 +397,6 @@ app.get('/', async (req, res) => {
   try {
     const sites = await db.getSiteStats();
     const stats = await db.getEventStats();
-
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -939,4 +938,16 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+});
+
+// Start the servers
+const WEB_PORT = process.env.WEB_PORT || 3000;
+const EVENT_PORT = process.env.EVENT_PORT || 3001;
+
+webServer.listen(WEB_PORT, () => {
+  console.log(`Web server running on port ${WEB_PORT}`);
+});
+
+eventServer.listen(EVENT_PORT, () => {
+  console.log(`Event server running on port ${EVENT_PORT}`);
 });
