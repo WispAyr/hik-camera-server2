@@ -430,6 +430,29 @@ class Database extends EventEmitter {
         });
     }
 
+    async getEventStats() {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT 
+                    COUNT(*) as total_events,
+                    COUNT(CASE WHEN dateTime >= datetime('now', '-24 hours') THEN 1 END) as last_24h_events,
+                    COUNT(CASE WHEN dateTime >= datetime('now', '-7 days') THEN 1 END) as last_7d_events,
+                    COUNT(DISTINCT licensePlate) as unique_plates,
+                    COUNT(DISTINCT channelID) as active_cameras,
+                    MAX(dateTime) as last_detection
+                FROM events
+            `;
+
+            this.db.get(sql, [], (err, row) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(row);
+                }
+            });
+        });
+    }
+
     async getSiteStats() {
         return new Promise((resolve, reject) => {
             const sql = `
