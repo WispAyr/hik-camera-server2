@@ -203,6 +203,7 @@ const uploadFields = [
   { name: 'licensePlate', maxCount: 1 },
   { name: 'licensePlatePicture.jpg', maxCount: 1 },
   { name: 'vehicle', maxCount: 1 },
+  { name: 'vehiclePicture.jpg', maxCount: 1 },
   { name: 'detection', maxCount: 1 }
 ];
 
