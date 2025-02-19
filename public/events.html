@@ -226,7 +226,7 @@
         updateEvents();
 
         // Set up WebSocket connection for real-time updates
-        const ws = new WebSocket(`ws://${window.location.host}`);
+        const ws = new WebSocket(`ws://${window.location.host}:8080`);
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'eventUpdate') {
