@@ -40,11 +40,10 @@ const hikApp = express();
 
 // Serve static files from public directory
 webApp.use(express.static(path.join(__dirname, 'public')));
-eventApp.use(express.static(path.join(__dirname, 'public')));
+
 
 // Serve static files from uploads directory for both apps
 webApp.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-eventApp.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Parse JSON bodies
 webApp.use(express.json());
