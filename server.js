@@ -36,8 +36,7 @@ if (!fs.existsSync(uploadDir)){
 
 // Initialize express apps
 const webApp = express();
-const eventApp = express();
-const hikApp = express(); // New app for HIK camera events
+const hikApp = express();
 
 // Serve static files from public directory
 webApp.use(express.static(path.join(__dirname, 'public')));
@@ -65,7 +64,6 @@ hikApp.use(morganMiddleware);
 
 // Create HTTP servers
 const webServer = require('http').createServer(webApp);
-const eventServer = require('http').createServer(eventApp);
 const hikServer = require('http').createServer(hikApp);
 
 // Initialize WebSocket server on the event server
@@ -176,21 +174,7 @@ const startServers = async () => {
 startServers();
 
 // Add API endpoints
-eventApp.get('/api/events', async (req, res) => {
-    try {
-        const options = {
-            licensePlate: req.query.licensePlate,
-            dateFrom: req.query.start_date,
-            dateTo: req.query.end_date,
-            site_id: req.query.site_id
-        };
-        const events = await db.getAllEvents(options);
-        res.json(events);
-    } catch (error) {
-        console.error('Error fetching events:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
+
 
 // Configure HIK camera event endpoints
 const handleVehicleDetection = async (req, res, next) => {
