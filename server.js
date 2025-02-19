@@ -398,8 +398,6 @@ app.get('/', async (req, res) => {
 app.get('/manage-cameras', async (req, res) => {
   try {
     const cameras = await db.getCameras();
-    const sites = await db.getSiteStats();
-
     res.send('<!DOCTYPE html>' +
       '<html>' +
       '<head>' +
@@ -448,73 +446,24 @@ app.get('/manage-cameras', async (req, res) => {
             'font-weight: 500;' +
             'transition: background-color 0.3s ease;' +
           '}' +
-          '.button:hover {' +
-            'background-color: var(--accent-hover);' +
-          '}' +
-          '.events-grid {' +
-            'display: grid;' +
-            'grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));' +
-            'gap: 20px;' +
-          '}' +
-          '.event-card {' +
-            'background-color: var(--bg-secondary);' +
-            'border-radius: 12px;' +
-            'padding: 20px;' +
-            'transition: transform 0.3s ease;' +
-            'cursor: pointer;' +
-          '}' +
-          '.event-card:hover {' +
-            'transform: translateY(-5px);' +
-          '}' +
-          '.event-details {' +
-            'margin-bottom: 15px;' +
-          '}' +
-          '.event-details div {' +
-            'margin-bottom: 8px;' +
-            'color: var(--text-secondary);' +
-          '}' +
-          '.event-details div:first-child {' +
-            'color: var(--text-primary);' +
-            'font-size: 1.2em;' +
-            'font-weight: 500;' +
-          '}' +
-          '.event-images {' +
-            'display: grid;' +
-            'grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));' +
-            'gap: 10px;' +
-            'margin-top: 15px;' +
-          '}' +
-          '.event-image {' +
-            'width: 100%;' +
-            'height: 150px;' +
-            'object-fit: cover;' +
-            'border-radius: 8px;' +
-          '}' +
         '</style>' +
       '</head>' +
       '<body>' +
         '<div class="header">' +
-          '<h1>' + site.name + ' - Events</h1>' +
+          '<h1>Manage Cameras</h1>' +
           '<div class="header-buttons">' +
             '<button class="button" onclick="window.location.href=\'/\'">Back to Dashboard</button>' +
           '</div>' +
         '</div>' +
-        '<div class="events-grid">' +
-          events.map(event => (
-            '<div class="event-card">' +
-              '<div class="event-details">' +
-                '<div>License Plate: ' + event.licensePlate + '</div>' +
-                '<div>Date: ' + event.dateTime + '</div>' +
-                '<div>Type: ' + event.eventType + '</div>' +
-                '<div>Country: ' + (event.country || 'N/A') + '</div>' +
-                '<div>Lane: ' + (event.lane || 'N/A') + '</div>' +
-                '<div>Direction: ' + (event.direction || 'N/A') + '</div>' +
-                '<div>Confidence: ' + (event.confidenceLevel || 'N/A') + '</div>' +
-              '</div>' +
-              '<div class="event-images">' +
-                (event.licensePlateImage ? '<img class="event-image" src="/uploads/' + event.licensePlateImage + '" alt="License Plate">' : '') +
-                (event.vehicleImage ? '<img class="event-image" src="/uploads/' + event.vehicleImage + '" alt="Vehicle">' : '') +
-                (event.detectionImage ? '<img class="event-image" src="/uploads/' + event.detectionImage + '" alt="Detection">' : '') +
+        '<div class="cameras-grid">' +
+          cameras.map(camera => (
+            '<div class="camera-card">' +
+              '<div class="camera-details">' +
+                '<div>Name: ' + (camera.name || camera.channelID) + '</div>' +
+                '<div>Channel ID: ' + camera.channelID + '</div>' +
+                '<div>MAC Address: ' + (camera.macAddress || 'N/A') + '</div>' +
+                '<div>Status: ' + camera.status + '</div>' +
+                '<div>Last Seen: ' + (camera.last_seen || 'N/A') + '</div>' +
               '</div>' +
             '</div>'
           )).join('') +
@@ -588,6 +537,15 @@ app.get('/site/:id', async (req, res) => {
                 '<div>License Plate: ' + event.licensePlate + '</div>' +
                 '<div>Date: ' + event.dateTime + '</div>' +
                 '<div>Type: ' + event.eventType + '</div>' +
+                '<div>Country: ' + (event.country || 'N/A') + '</div>' +
+                '<div>Lane: ' + (event.lane || 'N/A') + '</div>' +
+                '<div>Direction: ' + (event.direction || 'N/A') + '</div>' +
+                '<div>Confidence: ' + (event.confidenceLevel || 'N/A') + '</div>' +
+              '</div>' +
+              '<div class="event-images">' +
+                (event.licensePlateImage ? '<img class="event-image" src="/uploads/' + event.licensePlateImage + '" alt="License Plate">' : '') +
+                (event.vehicleImage ? '<img class="event-image" src="/uploads/' + event.vehicleImage + '" alt="Vehicle">' : '') +
+                (event.detectionImage ? '<img class="event-image" src="/uploads/' + event.detectionImage + '" alt="Detection">' : '') +
               '</div>' +
             '</div>'
           )).join('') +
