@@ -778,7 +778,7 @@ webApp.get('/', async (req, res) => {
 webApp.get('/api/events', async (req, res) => {
   try {
     const siteId = req.query.site_id;
-    const events = await db.getEvents(siteId);
+    const events = await db.getAllEvents({ site_id: siteId });
     res.json(events);
   } catch (error) {
     console.error('Error fetching events:', error);
