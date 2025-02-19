@@ -17,6 +17,10 @@ webApp.use(express.static(path.join(__dirname, 'public')));
 eventApp.use('/public', express.static(path.join(__dirname, 'public')));
 eventApp.use(express.static(path.join(__dirname, 'public')));
 
+// Serve static files from uploads directory for both apps
+webApp.use('/uploads', express.static('uploads'));
+eventApp.use('/uploads', express.static('uploads'));
+
 // Parse JSON bodies
 webApp.use(express.json());
 eventApp.use(express.json());
