@@ -175,6 +175,17 @@ const startServers = async () => {
 
 startServers();
 
+// Add API endpoints
+eventApp.get('/api/events', async (req, res) => {
+    try {
+        const events = await db.getAllEvents();
+        res.json(events);
+    } catch (error) {
+        console.error('Error fetching events:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Configure HIK camera event endpoints
 const handleVehicleDetection = async (req, res, next) => {
   try {
