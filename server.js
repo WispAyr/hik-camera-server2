@@ -6,6 +6,23 @@ const fs = require('fs');
 const db = require('./database');
 const WebSocket = require('ws');
 
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)){
+      fs.mkdirSync(uploadDir);
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
 // Initialize express apps
 const webApp = express();
 const eventApp = express();
@@ -127,6 +144,7 @@ startServers();
 // Configure HIK camera event endpoints
 const handleVehicleDetection = async (req, res) => {
   try {
+    console.log('Received vehicle detection event:', req.query);
     // Extract event data from query parameters
     const eventData = {
       channelID: req.query.channelID,
@@ -137,8 +155,24 @@ const handleVehicleDetection = async (req, res) => {
       lane: req.query.lane,
       direction: req.query.direction,
       confidenceLevel: req.query.confidenceLevel,
-      macAddress: req.query.macAddress
+      macAddress: req.query.macAddress,
+      images: {}
     };
+
+    // Handle image files if they exist
+    if (req.files) {
+      if (req.files.licensePlate) {
+        eventData.images.licensePlate = req.files.licensePlate[0].filename;
+      }
+      if (req.files.vehicle) {
+        eventData.images.vehicle = req.files.vehicle[0].filename;
+      }
+      if (req.files.detection) {
+        eventData.images.detection = req.files.detection[0].filename;
+      }
+    }
+    
+    console.log('Processed event data:', eventData);
 
     // Store event in database
     const eventId = await db.insertEvent(eventData);
@@ -158,8 +192,14 @@ const handleVehicleDetection = async (req, res) => {
 };
 
 // Handle events on both root path and /hik endpoint
-hikApp.post('/', handleVehicleDetection);
-hikApp.post('/hik', handleVehicleDetection);
+const uploadFields = [
+  { name: 'licensePlate', maxCount: 1 },
+  { name: 'vehicle', maxCount: 1 },
+  { name: 'detection', maxCount: 1 }
+];
+
+hikApp.post('/', upload.fields(uploadFields), handleVehicleDetection);
+hikApp.post('/hik', upload.fields(uploadFields), handleVehicleDetection);
 
 // Site management endpoints on web server
 webApp.get('/api/sites/:id', async (req, res) => {
