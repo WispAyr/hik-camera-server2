@@ -92,7 +92,17 @@ class Database {
     insertEvent(event) {
         return new Promise(async (resolve, reject) => {
             try {
-                const siteId = await this.createOrGetSite(event.channelID);
+                // Store camera details if not exists
+                const insertCameraSQL = `
+                    INSERT OR IGNORE INTO cameras (channelID, macAddress)
+                    VALUES (?, ?)
+                `;
+                await new Promise((resolve, reject) => {
+                    this.db.run(insertCameraSQL, [event.channelID, event.macAddress], (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    });
+                });
                 
                 const sql = `
                     INSERT INTO events (
@@ -116,7 +126,7 @@ class Database {
                     event.images?.licensePlate,
                     event.images?.vehicle,
                     event.images?.detection,
-                    siteId
+                    null  // site_id is not assigned automatically
                 ];
 
                 this.db.run(sql, params, function(err) {
