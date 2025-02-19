@@ -203,8 +203,8 @@ const uploadFields = [
   { name: 'detection', maxCount: 1 }
 ];
 
-hikApp.post('/', uploadHandler.fields(uploadFields), handleVehicleDetection);
-hikApp.post('/hik', uploadHandler.fields(uploadFields), handleVehicleDetection);
+hikApp.post('/', hikUploadHandler.fields(uploadFields), handleVehicleDetection);
+hikApp.post('/hik', hikUploadHandler.fields(uploadFields), handleVehicleDetection);
 
 // Site management endpoints on web server
 webApp.get('/api/sites/:id', async (req, res) => {
