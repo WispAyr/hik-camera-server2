@@ -131,14 +131,14 @@ class Database extends EventEmitter {
                     event.site_id || null  // Use site_id if provided, otherwise null
                 ];
 
-                this.db.run(sql, params, function(err) {
+                this.db.run(sql, params, (err) => {
                     if (err) {
                         reject(err);
                     } else {
                         this.emit('eventUpdate');
                         resolve(this.lastID);
                     }
-                }.bind(this));
+                });
             } catch (error) {
                 reject(error);
             }
