@@ -392,6 +392,37 @@ class Database {
         });
     }
 
+    async updateSite(id, name, description) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                UPDATE sites
+                SET name = ?, description = ?
+                WHERE id = ?
+            `;
+            
+            this.db.run(sql, [name, description, id], function(err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(this.changes);
+                }
+            });
+        });
+    }
+
+    async getSiteById(id) {
+        return new Promise((resolve, reject) => {
+            const sql = 'SELECT * FROM sites WHERE id = ?';
+            this.db.get(sql, [id], (err, row) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(row);
+                }
+            });
+        });
+    }
+
     close() {
         return new Promise((resolve, reject) => {
             this.db.close((err) => {

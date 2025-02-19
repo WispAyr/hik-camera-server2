@@ -4,9 +4,56 @@ const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
 const db = require('./database');
+const WebSocket = require('ws');
 
 // Initialize express app
 const app = express();
+
+// Parse JSON bodies
+app.use(express.json());
+
+// Add logging middleware only for POST requests
+app.use(morgan('combined', {
+  skip: function (req, res) { 
+    // Skip logging for all GET requests and successful responses
+    return req.method === 'GET' || res.statusCode < 400;
+  }
+}));
+
+// Create HTTP server
+const server = require('http').createServer(app);
+
+// Initialize WebSocket server
+const wss = new WebSocket.Server({ server });
+
+// WebSocket connection handling
+wss.on('connection', (ws) => {
+    console.log('New client connected');
+
+    // Send initial data
+    sendDashboardData(ws);
+
+    // Set up interval for periodic updates
+    const updateInterval = setInterval(() => {
+        sendDashboardData(ws);
+    }, 5000); // Update every 5 seconds
+
+    ws.on('close', () => {
+        clearInterval(updateInterval);
+        console.log('Client disconnected');
+    });
+});
+
+// Function to send dashboard data to WebSocket clients
+async function sendDashboardData(ws) {
+    try {
+        const stats = await db.getEventStats();
+        const sites = await db.getSiteStats();
+        ws.send(JSON.stringify({ type: 'dashboard_update', stats, sites }));
+    } catch (error) {
+        console.error('Error sending dashboard data:', error);
+    }
+}
 
 // Parse JSON bodies
 app.use(express.json());
@@ -29,6 +76,19 @@ app.get('/api/sites', async (req, res) => {
     res.json(sites);
   } catch (error) {
     console.error('Error fetching sites:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/sites/:id', async (req, res) => {
+  try {
+    const site = await db.getSiteById(req.params.id);
+    if (!site) {
+      return res.status(404).json({ error: 'Site not found' });
+    }
+    res.json(site);
+  } catch (error) {
+    console.error('Error fetching site:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -122,6 +182,291 @@ app.delete('/api/sites/:id', async (req, res) => {
   }
 });
 
+// Management pages
+app.get('/manage-sites', async (req, res) => {
+  try {
+    const sites = await db.getSiteStats();
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Manage Sites - Vehicle Detection System</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          :root {
+            --bg-primary: #000000;
+            --bg-secondary: #111111;
+            --text-primary: #ffffff;
+            --text-secondary: #808080;
+            --accent: #005288;
+            --accent-hover: #006bb3;
+            --border: #1a1a1a;
+            --overlay: rgba(0, 0, 0, 0.8);
+          }
+          body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            margin-bottom: 30px;
+          }
+          .header-buttons {
+            display: flex;
+            gap: 10px;
+          }
+          .button {
+            background-color: var(--accent);
+            color: var(--text-primary);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+          }
+          .button:hover {
+            background-color: var(--accent-hover);
+          }
+          .sites-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+          }
+          .site-card {
+            background-color: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 12px;
+            transition: transform 0.3s ease;
+          }
+          .site-card:hover {
+            transform: translateY(-5px);
+          }
+          .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--overlay);
+            z-index: 1000;
+          }
+          .modal-content {
+            background-color: var(--bg-secondary);
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 500px;
+          }
+          .form-group {
+            margin-bottom: 15px;
+          }
+          .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+          }
+          .form-group input,
+          .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Manage Sites</h1>
+          <div class="header-buttons">
+            <button class="button" onclick="window.location.href='/'">Back to Dashboard</button>
+            <button class="button" onclick="showAddSiteModal()">Add New Site</button>
+          </div>
+        </div>
+
+        <div class="sites-grid">
+          ${sites.map(site => `
+            <div class="site-card">
+              <h3>${site.name}</h3>
+              <p>${site.description || 'No description'}</p>
+              <p>Events: ${site.eventCount || 0}</p>
+              <p>Last Detection: ${site.lastDetection || 'N/A'}</p>
+              <button class="button" onclick="editSite(${site.id})">Edit</button>
+              <button class="button" onclick="deleteSite(${site.id})">Delete</button>
+            </div>
+          `).join('')}
+        </div>
+
+        <div id="addSiteModal" class="modal">
+          <div class="modal-content">
+            <h2>Add New Site</h2>
+            <form id="addSiteForm" onsubmit="submitSite(event)">
+              <div class="form-group">
+                <label for="siteName">Site Name</label>
+                <input type="text" id="siteName" required>
+              </div>
+              <div class="form-group">
+                <label for="siteDescription">Description</label>
+                <textarea id="siteDescription" rows="3"></textarea>
+              </div>
+              <button type="submit" class="button">Add Site</button>
+              <button type="button" class="button" onclick="hideAddSiteModal()">Cancel</button>
+            </form>
+          </div>
+        </div>
+
+        <div id="editSiteModal" class="modal">
+          <div class="modal-content">
+            <h2>Edit Site</h2>
+            <form id="editSiteForm" onsubmit="submitEditSite(event)">
+              <input type="hidden" id="editSiteId">
+              <div class="form-group">
+                <label for="editSiteName">Site Name</label>
+                <input type="text" id="editSiteName" required>
+              </div>
+              <div class="form-group">
+                <label for="editSiteDescription">Description</label>
+                <textarea id="editSiteDescription" rows="3"></textarea>
+              </div>
+              <button type="submit" class="button">Save Changes</button>
+              <button type="button" class="button" onclick="hideEditSiteModal()">Cancel</button>
+            </form>
+          </div>
+        </div>
+
+        <script>
+          function showAddSiteModal() {
+            document.getElementById('addSiteModal').style.display = 'block';
+          }
+
+          function hideAddSiteModal() {
+            document.getElementById('addSiteModal').style.display = 'none';
+          }
+
+          function showEditSiteModal() {
+            document.getElementById('editSiteModal').style.display = 'block';
+          }
+
+          function hideEditSiteModal() {
+            document.getElementById('editSiteModal').style.display = 'none';
+          }
+
+          async function editSite(id) {
+            try {
+              const response = await fetch('/api/sites/' + id, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
+              if (response.ok) {
+                const site = await response.json();
+                document.getElementById('editSiteId').value = id;
+                document.getElementById('editSiteName').value = site.name;
+                document.getElementById('editSiteDescription').value = site.description || '';
+                showEditSiteModal();
+              } else {
+                alert('Error loading site details');
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              alert('Error loading site details');
+            }
+          }
+
+          async function submitEditSite(event) {
+            event.preventDefault();
+            const id = document.getElementById('editSiteId').value;
+            const name = document.getElementById('editSiteName').value;
+            const description = document.getElementById('editSiteDescription').value;
+
+            try {
+              const response = await fetch('/api/sites/' + id, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name, description })
+              });
+
+              if (response.ok) {
+                window.location.reload();
+              } else {
+                alert('Error updating site');
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              alert('Error updating site');
+            }
+          }
+
+          async function submitSite(event) {
+            event.preventDefault();
+            const name = document.getElementById('siteName').value;
+            const description = document.getElementById('siteDescription').value;
+
+            try {
+              const response = await fetch('/api/sites', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name, description })
+              });
+
+              if (response.ok) {
+                window.location.reload();
+              } else {
+                alert('Error adding site');
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              alert('Error adding site');
+            }
+          }
+
+          async function deleteSite(id) {
+            if (confirm('Are you sure you want to delete this site?')) {
+              try {
+                const response = await fetch('/api/sites/' + id, {
+                  method: 'DELETE'
+                });
+
+                if (response.ok) {
+                  window.location.reload();
+                } else {
+                  alert('Error deleting site');
+                }
+              } catch (error) {
+                console.error('Error:', error);
+                alert('Error deleting site');
+              }
+            }
+          }
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Error rendering sites management page:', error);
+    res.status(500).send('Internal server error');
+  }
+});
+
 // Serve HTML content
 // Main dashboard showing sites overview
 app.get('/', async (req, res) => {
@@ -162,6 +507,23 @@ app.get('/', async (req, res) => {
             background-color: var(--bg-secondary);
             border-radius: 12px;
             margin-bottom: 30px;
+          }
+          .header-buttons {
+            display: flex;
+            gap: 10px;
+          }
+          .manage-button {
+            background-color: var(--accent);
+            color: var(--text-primary);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+          }
+          .manage-button:hover {
+            background-color: var(--accent-hover);
           }
           .stats {
             display: grid;
@@ -208,6 +570,10 @@ app.get('/', async (req, res) => {
       <body>
         <div class="header">
           <h1>Sites Overview</h1>
+          <div class="header-buttons">
+            <button class="manage-button" onclick="window.location.href='/manage-sites'">Manage Sites</button>
+            <button class="manage-button" onclick="window.location.href='/manage-cameras'">Manage Cameras</button>
+          </div>
           <div id="clock"></div>
         </div>
 
@@ -260,6 +626,319 @@ app.get('/', async (req, res) => {
 });
 
 // Site-specific events page
+app.get('/manage-cameras', async (req, res) => {
+  try {
+    const cameras = await db.getCameras();
+    const sites = await db.getSiteStats();
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Manage Cameras - Vehicle Detection System</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          :root {
+            --bg-primary: #000000;
+            --bg-secondary: #111111;
+            --text-primary: #ffffff;
+            --text-secondary: #808080;
+            --accent: #005288;
+            --accent-hover: #006bb3;
+            --border: #1a1a1a;
+            --overlay: rgba(0, 0, 0, 0.8);
+          }
+          body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            margin-bottom: 30px;
+          }
+          .header-buttons {
+            display: flex;
+            gap: 10px;
+          }
+          .button {
+            background-color: var(--accent);
+            color: var(--text-primary);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+          }
+          .button:hover {
+            background-color: var(--accent-hover);
+          }
+          .cameras-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+          }
+          .camera-card {
+            background-color: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 12px;
+            transition: transform 0.3s ease;
+          }
+          .camera-card:hover {
+            transform: translateY(-5px);
+          }
+          .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--overlay);
+            z-index: 1000;
+          }
+          .modal-content {
+            background-color: var(--bg-secondary);
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 500px;
+          }
+          .form-group {
+            margin-bottom: 15px;
+          }
+          .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+          }
+          .form-group input,
+          .form-group select,
+          .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Manage Cameras</h1>
+          <div class="header-buttons">
+            <button class="button" onclick="window.location.href='/'">Back to Dashboard</button>
+            <button class="button" onclick="showAddCameraModal()">Add New Camera</button>
+          </div>
+        </div>
+
+        <div class="cameras-grid">
+          ${cameras.map(camera => `
+            <div class="camera-card">
+              <h3>${camera.name || camera.channelID}</h3>
+              <p>Channel ID: ${camera.channelID}</p>
+              <p>MAC Address: ${camera.macAddress || 'N/A'}</p>
+              <p>Description: ${camera.description || 'No description'}</p>
+              <p>Site: ${sites.find(site => site.id === camera.site_id)?.name || 'Unassigned'}</p>
+              <button class="button" onclick="editCamera(${camera.id})">Edit</button>
+              <button class="button" onclick="deleteCamera(${camera.id})">Delete</button>
+            </div>
+          `).join('')}
+        </div>
+
+        <div id="addCameraModal" class="modal">
+          <div class="modal-content">
+            <h2>Add New Camera</h2>
+            <form id="addCameraForm" onsubmit="submitCamera(event)">
+              <div class="form-group">
+                <label for="channelID">Channel ID*</label>
+                <input type="text" id="channelID" required>
+              </div>
+              <div class="form-group">
+                <label for="macAddress">MAC Address</label>
+                <input type="text" id="macAddress">
+              </div>
+              <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name">
+              </div>
+              <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" rows="3"></textarea>
+              </div>
+              <div class="form-group">
+                <label for="site_id">Site*</label>
+                <select id="site_id" required>
+                  <option value="">Select a site</option>
+                  ${sites.map(site => `
+                    <option value="${site.id}">${site.name}</option>
+                  `).join('')}
+                </select>
+              </div>
+              <button type="submit" class="button">Add Camera</button>
+              <button type="button" class="button" onclick="hideAddCameraModal()">Cancel</button>
+            </form>
+          </div>
+        </div>
+
+        <div id="editCameraModal" class="modal">
+          <div class="modal-content">
+            <h2>Edit Camera</h2>
+            <form id="editCameraForm" onsubmit="submitEditCamera(event)">
+              <input type="hidden" id="editCameraId">
+              <div class="form-group">
+                <label for="editName">Name</label>
+                <input type="text" id="editName">
+              </div>
+              <div class="form-group">
+                <label for="editDescription">Description</label>
+                <textarea id="editDescription" rows="3"></textarea>
+              </div>
+              <div class="form-group">
+                <label for="editSiteId">Site</label>
+                <select id="editSiteId" required>
+                  ${sites.map(site => `
+                    <option value="${site.id}">${site.name}</option>
+                  `).join('')}
+                </select>
+              </div>
+              <button type="submit" class="button">Save Changes</button>
+              <button type="button" class="button" onclick="hideEditCameraModal()">Cancel</button>
+            </form>
+          </div>
+        </div>
+
+        <script>
+          function showAddCameraModal() {
+            document.getElementById('addCameraModal').style.display = 'block';
+          }
+
+          function hideAddCameraModal() {
+            document.getElementById('addCameraModal').style.display = 'none';
+          }
+
+          function showEditCameraModal() {
+            document.getElementById('editCameraModal').style.display = 'block';
+          }
+
+          function hideEditCameraModal() {
+            document.getElementById('editCameraModal').style.display = 'none';
+          }
+
+          async function editCamera(id) {
+            try {
+              const response = await fetch('/api/cameras/' + id);
+              if (response.ok) {
+                const camera = await response.json();
+                document.getElementById('editCameraId').value = camera.id;
+                document.getElementById('editName').value = camera.name || '';
+                document.getElementById('editDescription').value = camera.description || '';
+                document.getElementById('editSiteId').value = camera.site_id || '';
+                showEditCameraModal();
+              } else {
+                alert('Error loading camera details');
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              alert('Error loading camera details');
+            }
+          }
+
+          async function submitEditCamera(event) {
+            event.preventDefault();
+            const id = document.getElementById('editCameraId').value;
+            const name = document.getElementById('editName').value;
+            const description = document.getElementById('editDescription').value;
+            const site_id = document.getElementById('editSiteId').value;
+
+            try {
+              const response = await fetch('/api/cameras/' + id, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name, description, site_id })
+              });
+
+              if (response.ok) {
+                window.location.reload();
+              } else {
+                alert('Error updating camera');
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              alert('Error updating camera');
+            }
+          }
+
+          async function submitCamera(event) {
+            event.preventDefault();
+            const channelID = document.getElementById('channelID').value;
+            const macAddress = document.getElementById('macAddress').value;
+            const name = document.getElementById('name').value;
+            const description = document.getElementById('description').value;
+            const site_id = document.getElementById('site_id').value;
+
+            try {
+              const response = await fetch('/api/cameras', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ channelID, macAddress, name, description, site_id })
+              });
+
+              if (response.ok) {
+                window.location.reload();
+              } else {
+                alert('Error adding camera');
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              alert('Error adding camera');
+            }
+          }
+
+          async function deleteCamera(id) {
+            if (confirm('Are you sure you want to delete this camera?')) {
+              try {
+                const response = await fetch('/api/cameras/' + id, {
+                  method: 'DELETE'
+                });
+
+                if (response.ok) {
+                  window.location.reload();
+                } else {
+                  alert('Error deleting camera');
+                }
+              } catch (error) {
+                console.error('Error:', error);
+                alert('Error deleting camera');
+              }
+            }
+          }
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Error rendering cameras management page:', error);
+    res.status(500).send('Internal server error');
+  }
+});
+
 app.get('/site/:id', async (req, res) => {
   try {
     const siteId = req.params.id;
@@ -508,7 +1187,22 @@ app.get('/site/:id', async (req, res) => {
         }
         
         async function editCamera(id) {
-          // Implement camera editing logic
+          const name = prompt('Enter new camera name:');
+          if (!name) return;
+          const description = prompt('Enter new camera description:');
+          const site_id = prompt('Enter new site ID:');
+          
+          try {
+            await fetch('/api/cameras/' + id, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, description, site_id })
+            });
+            loadCameras();
+          } catch (error) {
+            console.error('Error updating camera:', error);
+            alert('Failed to update camera');
+          }
         }
         
         async function deleteCamera(id) {
@@ -525,7 +1219,7 @@ app.get('/site/:id', async (req, res) => {
             loadCameras();
           } catch (error) {
             console.error('Error deleting camera:', error);
-            alert('Error deleting camera');
+            alert('Failed to delete camera');
           }
         }
         
@@ -826,7 +1520,11 @@ app.get('/site/:id', async (req, res) => {
           if (!confirm('Are you sure you want to delete this camera?')) return;
           
           try {
-            await fetch('/api/cameras/' + id, { method: 'DELETE' });
+            await fetch('/api/cameras/' + id, {
+              method: 'DELETE'
+            });
+            
+            // Reload cameras
             loadCameras();
           } catch (error) {
             console.error('Error deleting camera:', error);
@@ -1074,9 +1772,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start the server
-const PORT = 9001;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`View the dashboard at http://localhost:${PORT}`);
-  console.log(`Waiting for vehicle detection events...`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
