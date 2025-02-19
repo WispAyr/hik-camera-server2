@@ -774,7 +774,23 @@ webApp.get('/', async (req, res) => {
   }
 });
 
-// Site-specific events page
+// Event endpoints
+webApp.get('/api/events', async (req, res) => {
+  try {
+    const siteId = req.query.site_id;
+    const events = await db.getEvents(siteId);
+    res.json(events);
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Serve site-specific events page
+webApp.get('/site/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'site.html'));
+});
+
 webApp.get('/manage-cameras', async (req, res) => {
   try {
     const cameras = await db.getCameras();
