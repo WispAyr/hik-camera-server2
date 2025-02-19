@@ -2,6 +2,13 @@
 
 A robust HTTP server application designed to handle vehicle detection events from HIK cameras, featuring site management, real-time monitoring, and comprehensive event tracking.
 
+## System Architecture
+
+The system operates on a three-port architecture:
+- Port 80: Main HTTP server for web interface and API endpoints
+- Port 9000: WebSocket server for real-time updates
+- Port 9001: Camera event listener for HIK camera integration
+
 ## Features
 
 - **Site Management**
@@ -42,8 +49,14 @@ A robust HTTP server application designed to handle vehicle detection events fro
    ```
 
 3. Start the server:
+   Option 1 - Using npm:
    ```bash
    npm start
+   ```
+   Option 2 - Using startup script:
+   ```bash
+   chmod +x startup.sh
+   ./startup.sh
    ```
 
 ## Database Structure
@@ -86,19 +99,64 @@ The system uses SQLite with three main tables:
 
 ```
 GET /api/sites
+- Returns list of all sites
+- Query parameters:
+  - limit: Number of sites per page
+  - offset: Page offset
+
 POST /api/sites
+- Creates a new site
+- Required fields: name
+- Optional fields: description
+
 GET /api/sites/:id
+- Returns specific site details
+- Includes associated cameras
+
 PUT /api/sites/:id
+- Updates site information
+- Updateable fields: name, description
+
 DELETE /api/sites/:id
+- Removes site and disassociates cameras
 ```
 
 ### Camera Management
 
 ```
 GET /api/cameras
+- Returns list of all cameras
+- Query parameters:
+  - site_id: Filter by site
+  - status: Filter by status
+
 POST /api/cameras
+- Registers a new camera
+- Required fields: channelID, macAddress
+- Optional fields: name, description, site_id
+
 PUT /api/cameras/:id
+- Updates camera information
+- Updateable fields: name, description, site_id, status
+
 DELETE /api/cameras/:id
+- Removes camera registration
+```
+
+### Events API
+
+```
+GET /api/events
+- Returns list of detection events
+- Query parameters:
+  - start_date: Filter by start date
+  - end_date: Filter by end date
+  - site_id: Filter by site
+  - camera_id: Filter by camera
+
+GET /api/events/:id
+- Returns specific event details
+- Includes image URLs
 ```
 
 ## Web Interface
@@ -107,6 +165,8 @@ The system provides a modern web interface for:
 
 - Dashboard (`/`): Overview of all sites and system statistics
 - Site Management (`/manage-sites`): CRUD operations for sites
+- Camera Management (`/manage-cameras`): Camera configuration
+- Event History (`/events`): Searchable event log
 
 ## Real-time Updates
 
@@ -115,6 +175,7 @@ The system uses WebSocket connections to provide real-time updates:
 - Dashboard statistics updates every 5 seconds
 - Live event notifications
 - Site status changes
+- Camera connection status
 
 ## Dependencies
 
@@ -132,6 +193,17 @@ The application is built with Node.js and uses:
 - Promise-based database operations
 - RESTful API design
 - WebSocket for real-time updates
+- Environment variables for configuration
+
+## Error Handling
+
+The system implements comprehensive error handling:
+
+- HTTP status codes for API responses
+- Detailed error messages
+- Request validation
+- Database transaction rollbacks
+- WebSocket reconnection logic
 
 ## License
 
@@ -140,3 +212,9 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
