@@ -218,7 +218,12 @@ class Database {
                     s.id,
                     s.name,
                     COUNT(e.id) as eventCount,
-                    MAX(e.dateTime) as lastDetection
+                    MAX(e.dateTime) as lastDetection,
+                    (SELECT vehicleImage 
+                     FROM events e2 
+                     WHERE e2.site_id = s.id 
+                     ORDER BY e2.dateTime DESC 
+                     LIMIT 1) as lastVehicleImage
                 FROM sites s
                 LEFT JOIN events e ON s.id = e.site_id
                 GROUP BY s.id, s.name
