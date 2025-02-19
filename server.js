@@ -47,7 +47,6 @@ webApp.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Parse JSON bodies
 webApp.use(express.json());
-
 hikApp.use(express.json());
 
 // Add logging middleware only for POST requests
@@ -58,7 +57,6 @@ const morganMiddleware = morgan('combined', {
 });
 
 webApp.use(morganMiddleware);
-
 hikApp.use(morganMiddleware);
 
 // Create HTTP servers
