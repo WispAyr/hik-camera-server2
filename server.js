@@ -75,22 +75,7 @@ function broadcastUpdate(data) {
 }
 
 // WebSocket connection handling
-wss.on('connection', (ws) => {
-    console.log('New client connected');
 
-    // Send initial data
-    sendDashboardData(ws);
-
-    // Set up interval for periodic updates
-    const updateInterval = setInterval(() => {
-        sendDashboardData(ws);
-    }, 5000); // Update every 5 seconds
-
-    ws.on('close', () => {
-        clearInterval(updateInterval);
-        console.log('Client disconnected');
-    });
-});
 
 // Subscribe to database events
 db.on('siteUpdate', () => {
