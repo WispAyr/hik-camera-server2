@@ -92,8 +92,42 @@ const startServers = async () => {
 
 startServers();
 
-// Configure HIK camera event endpoint
-hikApp.post('/hik', async (req, res) => {
+// Configure HIK camera event endpoints
+const handleVehicleDetection = async (req, res) => {
+  try {
+    // Extract event data from query parameters
+    const eventData = {
+      channelID: req.query.channelID,
+      dateTime: req.query.dateTime,
+      eventType: req.query.eventType,
+      country: req.query.country,
+      licensePlate: req.query.licensePlate,
+      lane: req.query.lane,
+      direction: req.query.direction,
+      confidenceLevel: req.query.confidenceLevel,
+      macAddress: req.query.macAddress
+    };
+
+    // Store event in database
+    const eventId = await db.insertEvent(eventData);
+
+    // Broadcast event to connected WebSocket clients
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        sendDashboardData(client);
+      }
+    });
+
+    res.status(200).json({ success: true, eventId });
+  } catch (error) {
+    console.error('Error processing HIK event:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Handle events on both root path and /hik endpoint
+hikApp.post('/', handleVehicleDetection);
+hikApp.post('/hik', handleVehicleDetection);
   try {
     // Extract event data from query parameters
     const eventData = {
