@@ -199,6 +199,14 @@ webApp.post('/api/sites', async (req, res) => {
       return res.status(400).json({ error: 'Site name is required' });
     }
     const siteId = await db.createOrGetSite(name, description);
+    
+    // Broadcast dashboard update to all connected clients
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        sendDashboardData(client);
+      }
+    });
+    
     res.status(201).json({ id: siteId, name, description });
   } catch (error) {
     console.error('Error creating site:', error);
