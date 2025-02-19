@@ -21,7 +21,7 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage: storage });
+const uploadHandler = multer({ storage: storage });
 
 // Initialize express apps
 const webApp = express();
@@ -198,8 +198,8 @@ const uploadFields = [
   { name: 'detection', maxCount: 1 }
 ];
 
-hikApp.post('/', upload.fields(uploadFields), handleVehicleDetection);
-hikApp.post('/hik', upload.fields(uploadFields), handleVehicleDetection);
+hikApp.post('/', uploadHandler.fields(uploadFields), handleVehicleDetection);
+hikApp.post('/hik', uploadHandler.fields(uploadFields), handleVehicleDetection);
 
 // Site management endpoints on web server
 webApp.get('/api/sites/:id', async (req, res) => {
@@ -1133,7 +1133,7 @@ webApp.get('/site/:id', async (req, res) => {
   }
 });
 
-const upload = multer({
+const uploadHandler = multer({
   dest: 'uploads/',
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
