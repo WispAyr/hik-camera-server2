@@ -430,6 +430,32 @@ class Database extends EventEmitter {
         });
     }
 
+    async getSiteStats() {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT 
+                    s.id,
+                    s.name,
+                    COUNT(DISTINCT e.id) as total_events,
+                    MAX(e.dateTime) as last_detection,
+                    COUNT(DISTINCT c.id) as camera_count
+                FROM sites s
+                LEFT JOIN events e ON s.id = e.site_id
+                LEFT JOIN cameras c ON s.id = c.site_id
+                GROUP BY s.id, s.name
+                ORDER BY s.name
+            `;
+
+            this.db.all(sql, [], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows);
+                }
+            });
+        });
+    }
+
     close() {
         return new Promise((resolve, reject) => {
             this.db.close((err) => {
